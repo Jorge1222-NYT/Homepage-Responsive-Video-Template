@@ -4,7 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Homepage prototype: Style</title>
-  <link rel="stylesheet" href="styles.css" />
+  <script>
+    // ?view=window drops the phone frame and uses the real browser window.
+    if (new URLSearchParams(location.search).get("view") === "window") {
+      document.documentElement.dataset.view = "window";
+    }
+  </script>
+  <link rel="stylesheet" href="styles.css?v=4" />
 </head>
 <body data-version="letterbox" data-layout="mobile">
   <main class="stage">
@@ -80,7 +86,7 @@
             </div>
 
             <div class="style-player">
-            <div class="player" id="player" data-version="letterbox" data-state="editorial" data-segment="editorial">
+            <div class="player is-loading" id="player" data-version="letterbox" data-state="editorial" data-segment="editorial">
               <video
                 id="editorial"
                 class="media editorial"
@@ -134,6 +140,12 @@
                       <path d="M14 10.8a3.6 3.6 0 0 0-5.1-.4l-1.8 1.8a3.6 3.6 0 0 0 5.1 5.1l1-1"/>
                     </svg>
                   </button>
+                  <button class="icon-btn" id="ccBtn" type="button" aria-label="Captions" aria-pressed="false">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <rect x="3.5" y="5.5" width="17" height="13" rx="2"/>
+                      <path d="M10.4 10.3a2 2 0 1 0 0 3.4M16.4 10.3a2 2 0 1 0 0 3.4"/>
+                    </svg>
+                  </button>
                 </div>
                 <p class="credit">The New York Times</p>
               </div>
@@ -160,6 +172,14 @@
                 <div class="progress-fill" id="progressFill"></div>
                 <div class="progress-knob" id="progressKnob"></div>
               </div>
+
+              <div class="loading" id="loading" role="status" aria-label="Loading video">
+                <span class="spinner"></span>
+              </div>
+
+              <div class="error-card" id="errorCard" role="alert">
+                <p id="errorText">Unable to play video. Please refresh to try again.</p>
+              </div>
             </div>
 
             <p class="caption">Alex Pena, Stephanie Figgins, Axel Boada and Caroline Kim</p>
@@ -180,8 +200,15 @@
       </div>
     </section>
 
-    <aside class="panel">
-      <h2>Homepage prototype</h2>
+    <aside class="panel" id="panel">
+      <div class="panel-head">
+        <h2>Homepage prototype</h2>
+        <button class="panel-close" id="panelClose" type="button" aria-label="Hide tuning panel">Hide</button>
+      </div>
+      <p class="panel-links">
+        <a class="open-window" href="?view=window" target="_blank" rel="noopener">Open full-window preview</a>
+        <a class="open-frame" href="./">Back to phone frame</a>
+      </p>
       <h3>Screen</h3>
       <div class="layout-switch" role="group" aria-label="Screen size">
         <button class="is-on" id="layoutMobile" type="button" aria-pressed="true">Mobile</button>
@@ -196,11 +223,21 @@
       </div>
       <p class="panel-lead" id="switchNote">No thumbnail. The story starts on its own, and the ad sits in the black bars.</p>
 
+      <div class="frame-only">
+        <div class="thumb-switch" role="group" aria-label="Thumbnail design">
+          <button class="is-on" id="thumbA" type="button" aria-pressed="true">Intro Slate</button>
+          <button id="thumbB" type="button" aria-pressed="false">Static Cover</button>
+        </div>
+        <p class="panel-lead" id="thumbNote">Intro Slate. A darkened close-up with the headline centered and the Louis Vuitton mark at the bottom.</p>
+      </div>
+
       <div class="buttons">
         <button class="btn" id="playBtn" type="button">Pause</button>
         <button class="btn" id="replayBtn" type="button">Replay</button>
         <button class="btn" id="jumpBtn" type="button">Jump to cue</button>
         <button class="btn" id="triggerBtn" type="button">Play ad now</button>
+        <button class="btn" id="loadingBtn" type="button">Test loading</button>
+        <button class="btn" id="errorBtn" type="button">Test error</button>
       </div>
 
       <h3>Tuning</h3>
@@ -256,8 +293,13 @@
       </ul>
     </aside>
 
+    <button class="sheet-tab" id="sheetTab" type="button" aria-controls="panel" aria-expanded="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 14l6-6 6 6"/></svg>
+      <span class="sheet-label">Tuning</span>
+    </button>
+
   </main>
 
-  <script src="main.js"></script>
+  <script src="main.js?v=5"></script>
 </body>
 </html>

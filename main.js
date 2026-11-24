@@ -19,6 +19,19 @@ const AD_SRC = {
   frame: "frame-media/ad.mp4",
 };
 
+// Thumbnail designs for the "Thumbnail" version. A is the Intro Slate, B is the Static Cover.
+const THUMBS = {
+  a: {
+    src: "frame-media/ad-frame.png",
+    note: "Intro Slate. A darkened close-up with the headline centered and the Louis Vuitton mark at the bottom.",
+  },
+  b: {
+    src: "thumbnails/thumbnail-b.jpg",
+    note: "Static Cover. A wider street shot, with the headline and sponsor line in a black card at the top.",
+  },
+};
+for (const design of Object.values(THUMBS)) new Image().src = design.src; // preload
+
 const $ = (id) => document.getElementById(id);
 
 const player = $("player");
@@ -36,6 +49,7 @@ const ui = {
   playBtn: $("playBtn"),
 };
 
+let thumb = "a";
 let version = "letterbox";
 let segment = "editorial";
 let playing = false;
@@ -45,6 +59,8 @@ let transitioning = false;
 let adPlayed = false;
 let resumeAt = 0;
 let generation = 0;
+let playerError = false;
+let simLoadTimer = 0;
 
 const frame = {
   status: "done",
@@ -181,8 +197,46 @@ function updateFrame(now) {
   if (playing && elapsed >= cfg.frameDuration * 1000 && inView) finishFrame();
 }
 
+function setMuted(next) {
+  editorial.muted = next;
+  ad.muted = next;
+  muteBtn.classList.toggle("is-muted", next);
+  muteBtn.setAttribute("aria-pressed", String(next));
+  muteBtn.setAttribute("aria-label", next ? "Unmute" : "Mute");
+}
+
+function setLoading(on) {
+  if (playerError) return;
+  player.classList.toggle("is-loading", on);
+}
+
+function playbackErrorMessage() {
+  return navigator.onLine === false
+    ? "Unable to play video. Please check your Internet connection and try again."
+    : "Unable to play video. Please refresh to try again.";
+}
+
+function showError(message) {
+  playerError = true;
+  $("errorText").textContent = message;
+  player.classList.remove("is-loading");
+  player.classList.add("is-error");
+  renderPlayback();
+}
+
+function clearError() {
+  playerError = false;
+  player.classList.remove("is-error");
+}
+
 function renderPlayback() {
   ui.playBtn.textContent = userWantsPlay ? "Pause" : "Play";
+  if (playerError) {
+    playing = false;
+    editorial.pause();
+    ad.pause();
+    return;
+  }
   if (transitioning) {
     playing = userWantsPlay && onScreen;
     if (!playing) {
@@ -224,6 +278,11 @@ function resetExperience() {
   transitioning = false;
   adPlayed = false;
   resumeAt = 0;
+  if (playerError) {
+    clearError();
+    if (editorial.error) editorial.load();
+    setLoading(true);
+  }
   editorial.pause();
   ad.pause();
   try { editorial.currentTime = 0; } catch (err) { /* ignore */ }
@@ -250,7 +309,9 @@ const LAYOUTS = {
   desktop: "Desktop. A wide front page, with the Style video in its own column.",
 };
 
-function applyLayout(next) {
+const windowView = document.documentElement.dataset.view === "window";
+
+function applyLayout(next, { keepScroll = false } = {}) {
   const changed = document.body.dataset.layout !== next;
   document.body.dataset.layout = next;
   for (const name of Object.keys(LAYOUTS)) {
@@ -259,8 +320,8 @@ function applyLayout(next) {
     button.classList.toggle("is-on", on);
     button.setAttribute("aria-pressed", String(on));
   }
-  $("layoutNote").textContent = LAYOUTS[next];
-  if (changed) homeScroll.scrollTop = 0;
+  $("layoutNote").textContent = (windowView ? "Follows the window width. " : "") + LAYOUTS[next];
+  if (changed && !keepScroll) homeScroll.scrollTop = 0;
 }
 
 function applyVersion(next) {
@@ -280,6 +341,19 @@ function applyVersion(next) {
     ad.load();
   }
   resetExperience();
+}
+
+function applyThumb(next) {
+  if (next === thumb) return;
+  thumb = next;
+  $("adFrame").querySelector("img").src = THUMBS[next].src;
+  $("thumbA").classList.toggle("is-on", next === "a");
+  $("thumbB").classList.toggle("is-on", next === "b");
+  $("thumbA").setAttribute("aria-pressed", String(next === "a"));
+  $("thumbB").setAttribute("aria-pressed", String(next === "b"));
+  $("thumbNote").textContent = THUMBS[next].note;
+  // Replay so the new thumbnail shows right away.
+  if (version === "frame") resetExperience();
 }
 
 async function goTo(next) {
@@ -372,9 +446,11 @@ function render() {
     `phase        ${phase}\n` +
     `segment      ${segment}\n` +
     `thumbnail    ${frameLabel}\n` +
+    `thumb design ${thumb === "a" ? "intro slate" : "static cover"}\n` +
     `on screen    ${onScreen ? "yes" : "no"}\n` +
     `editorial t  ${(editorial.currentTime || 0).toFixed(1)}s\n` +
     `ad t         ${adElapsed().toFixed(1)}s / ${adLimit().toFixed(0)}s\n` +
+    `muted        ${editorial.muted ? "yes" : "no"}\n` +
     `break at     ${cfg.breakAt}s (cue at ${(cfg.breakAt - cfg.cueLead).toFixed(0)}s)\n` +
     `lights out   ${cfg.lightsOut}ms\n` +
     `hold black   ${cfg.holdBlack}ms\n` +
@@ -385,8 +461,16 @@ function render() {
 
 ui.playBtn.addEventListener("click", () => setPlaying(!userWantsPlay));
 
+// Tap behavior from the July 2026 spec:
+// - While muted, the first tap unmutes (and taps on controls do too).
+// - While unmuted, a tap on the video toggles play/pause.
 player.addEventListener("click", (event) => {
   const button = event.target.closest("button");
+  if (button && button.id === "muteBtn") return; // handled by its own listener
+  if (editorial.muted) {
+    setMuted(false);
+    return;
+  }
   if (button && button.id !== "playToggle") return;
   setPlaying(!userWantsPlay);
 });
@@ -416,6 +500,9 @@ $("verFrame").addEventListener("click", () => {
   if (version !== "frame") applyVersion("frame");
 });
 
+$("thumbA").addEventListener("click", () => applyThumb("a"));
+$("thumbB").addEventListener("click", () => applyThumb("b"));
+
 $("layoutMobile").addEventListener("click", () => applyLayout("mobile"));
 $("layoutTablet").addEventListener("click", () => applyLayout("tablet"));
 $("layoutDesktop").addEventListener("click", () => applyLayout("desktop"));
@@ -439,14 +526,23 @@ ui.skip.addEventListener("click", () => {
 });
 
 const muteBtn = $("muteBtn");
-muteBtn.addEventListener("click", () => {
-  const muted = !editorial.muted;
-  editorial.muted = muted;
-  ad.muted = muted;
-  muteBtn.classList.toggle("is-muted", muted);
-  muteBtn.setAttribute("aria-pressed", String(muted));
-  muteBtn.setAttribute("aria-label", muted ? "Unmute" : "Mute");
+muteBtn.addEventListener("click", () => setMuted(!editorial.muted));
+
+$("ccBtn").addEventListener("click", () => {
+  const on = $("ccBtn").getAttribute("aria-pressed") !== "true";
+  $("ccBtn").setAttribute("aria-pressed", String(on));
+  $("ccBtn").classList.toggle("is-on", on);
 });
+
+// Panel test buttons for the loading and error states.
+$("loadingBtn").addEventListener("click", () => {
+  if (playerError) return;
+  setLoading(true);
+  clearTimeout(simLoadTimer);
+  simLoadTimer = setTimeout(() => setLoading(false), 2500);
+});
+
+$("errorBtn").addEventListener("click", () => showError(playbackErrorMessage()));
 
 $("expandBtn").addEventListener("click", () => {
   if (document.fullscreenElement) document.exitFullscreen();
@@ -459,6 +555,16 @@ $("styleJump").addEventListener("click", () => {
 
 editorial.addEventListener("timeupdate", onEditorialTime);
 ad.addEventListener("timeupdate", onAdTime);
+
+// Loading: spinner over a blurred frame while data is missing or stalled.
+for (const video of [editorial, ad]) {
+  video.addEventListener("waiting", () => setLoading(true));
+  video.addEventListener("stalled", () => setLoading(true));
+  for (const ready of ["loadeddata", "canplay", "playing"]) {
+    video.addEventListener(ready, () => setLoading(false));
+  }
+  video.addEventListener("error", () => showError(playbackErrorMessage()));
+}
 ad.addEventListener("ended", () => {
   if (segment === "ad" && !transitioning) goTo("editorial");
 });
@@ -493,6 +599,44 @@ const viewObserver = new IntersectionObserver((entries) => {
 
 viewObserver.observe(player);
 editorial.addEventListener("loadeddata", () => renderPlayback());
+
+// Full-window view: the layout follows the browser width, and the tuning
+// panel is a bottom sheet that starts hidden.
+if (windowView) {
+  const sheetPanel = $("panel");
+  const sheetTab = $("sheetTab");
+  const sheetLabel = sheetTab.querySelector(".sheet-label");
+
+  const layoutForWidth = (width) => (width < 700 ? "mobile" : width < 1100 ? "tablet" : "desktop");
+  const syncLayout = () => applyLayout(layoutForWidth(window.innerWidth), { keepScroll: true });
+  window.addEventListener("resize", syncLayout);
+  syncLayout();
+
+  const measureSheet = () => {
+    const open = sheetPanel.classList.contains("is-open");
+    document.documentElement.style.setProperty("--sheet-h", open ? `${sheetPanel.offsetHeight}px` : "0px");
+  };
+
+  const setSheet = (open) => {
+    sheetPanel.classList.toggle("is-open", open);
+    sheetPanel.inert = !open;
+    sheetTab.setAttribute("aria-expanded", String(open));
+    sheetLabel.textContent = open ? "Hide" : "Tuning";
+    measureSheet();
+  };
+
+  sheetTab.addEventListener("click", () => setSheet(!sheetPanel.classList.contains("is-open")));
+  $("panelClose").addEventListener("click", () => setSheet(false));
+  window.addEventListener("resize", measureSheet);
+
+  document.addEventListener("keydown", (event) => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key === "Escape") setSheet(false);
+    else if (event.key === "t" || event.key === "T") setSheet(!sheetPanel.classList.contains("is-open"));
+  });
+
+  setSheet(false);
+}
 
 setSegment("editorial");
 setState("editorial");

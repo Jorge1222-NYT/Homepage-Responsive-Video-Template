@@ -586,6 +586,80 @@ body {
   transform: translateY(-50%);
 }
 
+/* ---------- Loading and error states (July 2026 video spec) ---------- */
+.loading,
+.error-card {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+}
+
+.loading {
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* Blur layer over the current frame, spinner on top */
+.loading::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.spinner {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.player.is-loading .loading { display: grid; }
+
+.error-card {
+  z-index: 7;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.88);
+  color: #fff;
+  text-align: center;
+  pointer-events: none;
+}
+
+.error-card p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+  max-width: 280px;
+}
+
+.player.is-error .error-card { display: grid; }
+
+.player.is-error .chrome,
+.player.is-error .progress,
+.player.is-error .play-toggle,
+.player.is-error .skip,
+.player.is-error .cue-pill,
+.player.is-error .continues,
+.player.is-error .loading {
+  display: none;
+}
+
+.icon-btn.is-on svg { stroke: #fff; }
+.icon-btn[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+}
+
 /* ---------- Control panel ---------- */
 .panel {
   position: fixed;
@@ -671,6 +745,7 @@ body {
 .notes li { margin-bottom: 6px; }
 
 .version-switch,
+.thumb-switch,
 .layout-switch {
   display: grid;
   gap: 4px;
@@ -680,10 +755,12 @@ body {
   border-radius: 999px;
 }
 
-.version-switch { grid-template-columns: 1fr 1fr; }
+.version-switch,
+.thumb-switch { grid-template-columns: 1fr 1fr; }
 .layout-switch { grid-template-columns: 1fr 1fr 1fr; }
 
 .version-switch button,
+.thumb-switch button,
 .layout-switch button {
   border: 0;
   border-radius: 999px;
@@ -696,6 +773,7 @@ body {
 }
 
 .version-switch button.is-on,
+.thumb-switch button.is-on,
 .layout-switch button.is-on {
   background: #121212;
   color: #fff;
@@ -980,6 +1058,135 @@ body:is([data-layout="tablet"], [data-layout="desktop"]) #food .photo {
 }
 
 body[data-layout="desktop"] #food .story-title { font-size: 28px; }
+
+/* ---------- Panel header and links (both views) ---------- */
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+}
+
+.panel-head h2 { margin: 0; }
+
+.panel-close,
+.sheet-tab { display: none; }
+
+.panel-links {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.panel-links a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.open-frame { display: none; }
+
+/* ---------- Full-window view (?view=window) ----------
+   No phone frame. Layout follows the real window width, and the
+   tuning panel becomes a bottom sheet with a toggle tab. */
+html[data-view="window"] body { background: #fff; }
+
+html[data-view="window"] .stage {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 0;
+  gap: 0;
+}
+
+html[data-view="window"] body[data-layout] .phone {
+  width: 100%;
+  max-width: 1280px;
+  height: 100vh;
+  height: 100dvh;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-view="window"] .layout-switch { display: none; }
+html[data-view="window"] .open-window { display: none; }
+html[data-view="window"] .open-frame { display: inline; }
+
+html[data-view="window"] .panel {
+  position: fixed;
+  top: auto;
+  right: auto;
+  bottom: 0;
+  left: 50%;
+  z-index: 40;
+  width: min(560px, 100%);
+  max-height: min(62vh, 560px);
+  max-height: min(62dvh, 560px);
+  padding-bottom: 28px;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 0 -10px 36px rgba(0, 0, 0, 0.2);
+  transform: translate(-50%, 100%);
+  transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+html[data-view="window"] .panel.is-open { transform: translate(-50%, 0); }
+
+html[data-view="window"] .panel-close {
+  display: inline-block;
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 12px;
+  border: 1px solid #cfcfcf;
+  border-radius: 999px;
+  background: #fff;
+  cursor: pointer;
+}
+
+html[data-view="window"] .panel-close:hover { border-color: var(--ink); }
+
+html[data-view="window"] .sheet-tab {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  z-index: 41;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px 0 10px;
+  border: 0;
+  border-radius: 12px 12px 0 0;
+  background: rgba(18, 18, 18, 0.88);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transform: translate(-50%, calc(-1 * var(--sheet-h, 0px)));
+  transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+html[data-view="window"] .sheet-tab svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 320ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+html[data-view="window"] .sheet-tab[aria-expanded="true"] svg { transform: rotate(180deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-view="window"] .panel,
+  html[data-view="window"] .sheet-tab,
+  html[data-view="window"] .sheet-tab svg { transition: none; }
+}
 
 @media (max-width: 1080px) {
   .stage {
